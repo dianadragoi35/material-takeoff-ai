@@ -6,6 +6,7 @@ import { Upload, FileText, Download, Loader2, CheckCircle, AlertCircle, Building
 
 export default function App() {
   const [files, setFiles] = useState<File[]>([]);
+  const [contextFiles, setContextFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [results, setResults] = useState<ResultFile[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +16,6 @@ export default function App() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
     const uploadedFiles = Array.from(event.target.files);
-    // FIX: Explicitly type 'f' as File to resolve TypeScript inference issue.
     const pdfFiles = uploadedFiles.filter((f: File) => f.type === 'application/pdf');
     
     if (pdfFiles.length !== uploadedFiles.length) {
@@ -29,10 +29,21 @@ export default function App() {
     }
     setResults([]);
   };
+  
+  const handleContextFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files) return;
+    const uploadedFiles = Array.from(event.target.files);
+    const pdfFiles = uploadedFiles.filter((f: File) => f.type === 'application/pdf');
+    setContextFiles(prev => [...prev, ...pdfFiles]);
+  };
 
   const removeFile = (index: number) => {
     setFiles(files.filter((_, i) => i !== index));
     setResults(results.filter((_, i) => i !== index));
+  };
+
+  const removeContextFile = (index: number) => {
+    setContextFiles(contextFiles.filter((_, i) => i !== index));
   };
 
   const analyzePDFs = async () => {
@@ -49,7 +60,6 @@ export default function App() {
         const file = files[i];
         setAnalysisStage(`Processing file ${i + 1} of ${files.length}: ${file.name}`);
 
-        // Build context from previously analyzed documents
         if (contextMode && allResults.length > 0) {
           const roofRelatedResults = allResults.filter(r => r.isRoofRelated);
           if (roofRelatedResults.length > 0) {
@@ -69,13 +79,13 @@ export default function App() {
 
         setAnalysisStage(`Analyzing ${file.name} with Gemini AI...`);
         
-        const analysisResults = await analyzePdfWithGemini(file, contextSummary);
+        const analysisResults = await analyzePdfWithGemini(file, contextFiles, contextSummary);
 
         allResults.push({
           fileName: file.name,
           ...analysisResults
         });
-        setResults([...allResults]); // Update results progressively
+        setResults([...allResults]);
       }
       setAnalysisStage('');
     } catch (err) {
@@ -186,6 +196,8 @@ export default function App() {
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8 mb-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-1">Step 1: Upload Roof Plans</h2>
+          <p className="text-sm text-gray-500 mb-4">Select the primary PDF files you want to analyze.</p>
           <div className="flex items-center justify-center w-full">
             <label className="flex flex-col items-center justify-center w-full min-h-64 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
               <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
@@ -216,15 +228,48 @@ export default function App() {
               <input type="file" className="hidden" accept=".pdf" multiple onChange={handleFileUpload} />
             </label>
           </div>
+          
+          <div className="mt-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-1">Step 2: Add Context Documents (Optional)</h2>
+            <p className="text-sm text-gray-500 mb-4">Upload PDFs with legends, material codes, or specifications to improve accuracy.</p>
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                {contextFiles.length > 0 && (
+                    <div className="space-y-2 mb-4">
+                        {contextFiles.map((f, index) => (
+                            <div key={index} className="flex items-center justify-between bg-white px-3 py-2 rounded border border-gray-200">
+                                <div className="flex items-center text-indigo-600 overflow-hidden">
+                                    <FileText className="w-4 h-4 mr-2 flex-shrink-0" />
+                                    <span className="text-sm font-medium truncate">{f.name}</span>
+                                </div>
+                                <button
+                                    onClick={(e) => { e.preventDefault(); removeContextFile(index); }}
+                                    className="text-red-500 hover:text-red-700 ml-2 p-1 flex-shrink-0"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                <label htmlFor="context-upload" className="flex items-center justify-center w-full border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 p-4 transition-colors">
+                    <Upload className="w-6 h-6 mr-3 text-gray-400" />
+                    <span className="text-sm text-gray-600 font-semibold">Upload Context Files</span>
+                    <input type="file" id="context-upload" className="hidden" accept=".pdf" multiple onChange={handleContextFileUpload} />
+                </label>
+            </div>
+          </div>
+
 
           {files.length > 0 && !processing && (
-            <>
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className='mt-8'>
+               <h2 className="text-xl font-bold text-gray-800 mb-1">Step 3: Analyze</h2>
+               <p className="text-sm text-gray-500 mb-4">Configure and start the analysis.</p>
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <label className="flex items-center cursor-pointer">
                   <input type="checkbox" checked={contextMode} onChange={(e) => setContextMode(e.target.checked)} className="mr-3 w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"/>
                   <div>
                     <span className="font-semibold text-gray-800">Context-Aware Analysis</span>
-                    <p className="text-sm text-gray-600 mt-1">Share information between PDFs. Useful for separate legend/spec and floor plan files.</p>
+                    <p className="text-sm text-gray-600 mt-1">Share information between plan analyses. Useful for separate legend/spec and floor plan files.</p>
                   </div>
                 </label>
               </div>
@@ -232,7 +277,7 @@ export default function App() {
                 <FileText className="w-5 h-5 mr-2" />
                 Analyze {files.length} Roof Plan{files.length > 1 ? 's' : ''}
               </button>
-            </>
+            </div>
           )}
 
           {error && (

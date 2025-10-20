@@ -102,7 +102,8 @@ SEARCH STRATEGY:
 4. Look for material symbols/hatching that might indicate roof materials.
 5. Even if this is labeled as a floor plan ("plattegrond"), section, or elevation, if ANY roof material is mentioned, mark as roof-related.
 6. Check for specification tables listing roof construction layers (these are VERY important for material identification).
-7. IMPORTANT FOR AREA CALCULATION:
+7. CROSS-REFERENCING WITH CONTEXT FILES: If there are context documents provided, actively look for detail callouts on the main plan. These are often marked with L-shaped arrows, circles, or boxes with a code (e.g., 'D-01', 'SN-A', 'Detail A'). You MUST find the corresponding detail in the context files to determine the exact material buildup. This is the most reliable source of information.
+8. IMPORTANT FOR AREA CALCULATION:
    - If this is a floor plan showing "retentiedak", "platdak", "groendak" or any flat roof type in the legend, measure the outer dimensions of the building footprint.
    - Calculate the total building area - this is your roof area for flat roofs. Flat roofs typically cover the entire building, so building footprint = roof area.
    - Look for dimension lines, scale bars, or grid dimensions to calculate accurately.

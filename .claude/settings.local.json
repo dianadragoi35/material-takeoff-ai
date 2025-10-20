@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/dianadragoi/Desktop/material-takeoff-ai /**)",
+      "Read(//Users/dianadragoi/Desktop/material-takeoff-ai /services/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
