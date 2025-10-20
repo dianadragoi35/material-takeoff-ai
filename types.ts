@@ -14,6 +14,16 @@ export interface Summary {
   planQuality: 'good' | 'fair' | 'poor';
 }
 
+export interface ValidationInfo {
+  pythonUsed: boolean;
+  pythonArea?: number;
+  aiArea?: number;
+  difference?: number;
+  differencePercent?: number;
+  recommendation?: 'use_ai' | 'use_python' | 'manual_review';
+  validationMessage?: string;
+}
+
 export interface AnalysisResult {
   isRoofRelated: boolean;
   documentType: string;
@@ -21,6 +31,7 @@ export interface AnalysisResult {
   scale: string;
   materials: Material[];
   summary: Summary;
+  validation?: ValidationInfo;
 }
 
 export interface ResultFile extends AnalysisResult {

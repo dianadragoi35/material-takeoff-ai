@@ -6,18 +6,17 @@ import { Upload, FileText, Download, Loader2, CheckCircle, AlertCircle, Building
 
 export default function App() {
   const [files, setFiles] = useState<File[]>([]);
-  const [contextFiles, setContextFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [results, setResults] = useState<ResultFile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [analysisStage, setAnalysisStage] = useState('');
-  const [contextMode, setContextMode] = useState(true);
+  const [pythonAvailable, setPythonAvailable] = useState<boolean | null>(null);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
     const uploadedFiles = Array.from(event.target.files);
     const pdfFiles = uploadedFiles.filter((f: File) => f.type === 'application/pdf');
-    
+
     if (pdfFiles.length !== uploadedFiles.length) {
       setError('Only PDF files are supported. Non-PDF files have been ignored.');
     } else {
@@ -29,21 +28,10 @@ export default function App() {
     }
     setResults([]);
   };
-  
-  const handleContextFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files) return;
-    const uploadedFiles = Array.from(event.target.files);
-    const pdfFiles = uploadedFiles.filter((f: File) => f.type === 'application/pdf');
-    setContextFiles(prev => [...prev, ...pdfFiles]);
-  };
 
   const removeFile = (index: number) => {
     setFiles(files.filter((_, i) => i !== index));
     setResults(results.filter((_, i) => i !== index));
-  };
-
-  const removeContextFile = (index: number) => {
-    setContextFiles(contextFiles.filter((_, i) => i !== index));
   };
 
   const analyzePDFs = async () => {
@@ -53,36 +41,16 @@ export default function App() {
     setError(null);
     setResults([]);
     const allResults: ResultFile[] = [];
-    let contextSummary = '';
 
     try {
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setAnalysisStage(`Processing file ${i + 1} of ${files.length}: ${file.name}`);
+        setAnalysisStage(`Analyzing file ${i + 1} of ${files.length}: ${files[i].name}`);
 
-        if (contextMode && allResults.length > 0) {
-          const roofRelatedResults = allResults.filter(r => r.isRoofRelated);
-          if (roofRelatedResults.length > 0) {
-            contextSummary = `\n\nCONTEXT FROM PREVIOUSLY ANALYZED DOCUMENTS:\n`;
-            roofRelatedResults.forEach((prevResult, idx) => {
-              contextSummary += `\nDocument ${idx + 1}: ${prevResult.fileName}\n`;
-              contextSummary += `- Document Type: ${prevResult.documentType}\n`;
-              contextSummary += `- Scale: ${prevResult.scale}\n`;
-              if (prevResult.materials && prevResult.materials.length > 0) {
-                contextSummary += `- Materials found: ${prevResult.materials.map(m => m.material).join(', ')}\n`;
-              }
-              contextSummary += `- Notes: This document may contain specifications, legends, or area measurements that relate to the current document\n`;
-            });
-            contextSummary += `\nUSE THIS CONTEXT: If the current document references materials or specifications from previous documents, use that information to enhance your analysis. If previous documents contained legends/specifications and this document shows areas, combine the information.\n`;
-          }
-        }
-
-        setAnalysisStage(`Analyzing ${file.name} with Gemini AI...`);
-        
-        const analysisResults = await analyzePdfWithGemini(file, contextFiles, contextSummary);
+        // Pass ALL files but specify which one is the target
+        const analysisResults = await analyzePdfWithGemini(files, i);
 
         allResults.push({
-          fileName: file.name,
+          fileName: files[i].name,
           ...analysisResults
         });
         setResults([...allResults]);
@@ -193,11 +161,24 @@ export default function App() {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">Material Takeoff AI</h1>
           <p className="text-gray-600">Automated roof plan analysis for construction estimating with Gemini</p>
+          {pythonAvailable !== null && (
+            <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium" style={{
+              backgroundColor: pythonAvailable ? '#f0fdf4' : '#fef3c7',
+              color: pythonAvailable ? '#15803d' : '#92400e'
+            }}>
+              <span className="w-2 h-2 rounded-full" style={{
+                backgroundColor: pythonAvailable ? '#22c55e' : '#f59e0b'
+              }}></span>
+              {pythonAvailable
+                ? 'Python CV validation enabled - Maximum accuracy mode'
+                : 'AI-only mode - Python validation unavailable'}
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8 mb-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-1">Step 1: Upload Roof Plans</h2>
-          <p className="text-sm text-gray-500 mb-4">Select the primary PDF files you want to analyze.</p>
+          <h2 className="text-xl font-bold text-gray-800 mb-1">Upload PDF Documents</h2>
+          <p className="text-sm text-gray-500 mb-4">Upload all related PDFs: floor plans, roof plans, legends, specifications, and detail sheets. The AI will automatically cross-reference them.</p>
           <div className="flex items-center justify-center w-full">
             <label className="flex flex-col items-center justify-center w-full min-h-64 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
               <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
@@ -205,7 +186,7 @@ export default function App() {
                 <p className="mb-2 text-sm text-gray-500">
                   <span className="font-semibold">Click to upload</span> or drag and drop
                 </p>
-                <p className="text-xs text-gray-500">PDF roof plans (multiple files supported)</p>
+                <p className="text-xs text-gray-500">All construction PDFs (plans, legends, details, specifications)</p>
                 {files.length > 0 && (
                   <div className="mt-4 w-full max-w-md space-y-2 text-left p-2">
                     {files.map((f, index) => (
@@ -228,55 +209,14 @@ export default function App() {
               <input type="file" className="hidden" accept=".pdf" multiple onChange={handleFileUpload} />
             </label>
           </div>
-          
-          <div className="mt-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-1">Step 2: Add Context Documents (Optional)</h2>
-            <p className="text-sm text-gray-500 mb-4">Upload PDFs with legends, material codes, or specifications to improve accuracy.</p>
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                {contextFiles.length > 0 && (
-                    <div className="space-y-2 mb-4">
-                        {contextFiles.map((f, index) => (
-                            <div key={index} className="flex items-center justify-between bg-white px-3 py-2 rounded border border-gray-200">
-                                <div className="flex items-center text-indigo-600 overflow-hidden">
-                                    <FileText className="w-4 h-4 mr-2 flex-shrink-0" />
-                                    <span className="text-sm font-medium truncate">{f.name}</span>
-                                </div>
-                                <button
-                                    onClick={(e) => { e.preventDefault(); removeContextFile(index); }}
-                                    className="text-red-500 hover:text-red-700 ml-2 p-1 flex-shrink-0"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                <label htmlFor="context-upload" className="flex items-center justify-center w-full border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 p-4 transition-colors">
-                    <Upload className="w-6 h-6 mr-3 text-gray-400" />
-                    <span className="text-sm text-gray-600 font-semibold">Upload Context Files</span>
-                    <input type="file" id="context-upload" className="hidden" accept=".pdf" multiple onChange={handleContextFileUpload} />
-                </label>
-            </div>
-          </div>
-
 
           {files.length > 0 && !processing && (
-            <div className='mt-8'>
-               <h2 className="text-xl font-bold text-gray-800 mb-1">Step 3: Analyze</h2>
-               <p className="text-sm text-gray-500 mb-4">Configure and start the analysis.</p>
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <label className="flex items-center cursor-pointer">
-                  <input type="checkbox" checked={contextMode} onChange={(e) => setContextMode(e.target.checked)} className="mr-3 w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"/>
-                  <div>
-                    <span className="font-semibold text-gray-800">Context-Aware Analysis</span>
-                    <p className="text-sm text-gray-600 mt-1">Share information between plan analyses. Useful for separate legend/spec and floor plan files.</p>
-                  </div>
-                </label>
-              </div>
-              <button onClick={analyzePDFs} className="mt-4 w-full bg-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center disabled:bg-indigo-300 disabled:cursor-not-allowed" disabled={processing}>
+            <div className='mt-6'>
+              <button onClick={analyzePDFs} className="w-full bg-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center disabled:bg-indigo-300 disabled:cursor-not-allowed" disabled={processing}>
                 <FileText className="w-5 h-5 mr-2" />
-                Analyze {files.length} Roof Plan{files.length > 1 ? 's' : ''}
+                Analyze {files.length} Document{files.length > 1 ? 's' : ''} with Cross-Referencing
               </button>
+              <p className="text-xs text-gray-500 mt-2 text-center">Each document will be analyzed with access to all others for cross-referencing detail callouts and legends</p>
             </div>
           )}
 
@@ -375,6 +315,35 @@ export default function App() {
                   </div>
                   {!result.isRoofRelated ? (<div className="p-4 bg-gray-100 rounded-lg"><p className="text-gray-600">This document does not contain roof-related information and was excluded from the building summary.</p></div>) : (
                     <>
+                      {result.validation && (
+                        <div className={`mb-4 p-4 rounded-lg border-2 ${
+                          result.validation.recommendation === 'use_ai' ? 'bg-green-50 border-green-200' :
+                          result.validation.recommendation === 'use_python' ? 'bg-blue-50 border-blue-200' :
+                          'bg-yellow-50 border-yellow-200'
+                        }`}>
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 mt-0.5">
+                              {result.validation.pythonUsed ? (
+                                <span className="px-2 py-1 bg-indigo-600 text-white rounded text-xs font-bold">PYTHON CV</span>
+                              ) : (
+                                <span className="px-2 py-1 bg-gray-600 text-white rounded text-xs font-bold">AI ONLY</span>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-800 mb-1">
+                                {result.validation.pythonUsed ? 'Area Validated with Computer Vision' : 'AI-Only Calculation'}
+                              </p>
+                              <p className="text-xs text-gray-600">{result.validation.validationMessage}</p>
+                              {result.validation.pythonUsed && result.validation.difference !== undefined && (
+                                <div className="mt-2 text-xs text-gray-500">
+                                  AI: {result.validation.aiArea?.toFixed(2)} m² | Python: {result.validation.pythonArea?.toFixed(2)} m² |
+                                  Diff: {result.validation.differencePercent?.toFixed(1)}%
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg"><p className="text-sm text-gray-600 mb-1">Drawing Scale</p><p className="text-2xl font-bold text-gray-800">{result.scale}</p></div>
                         <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg"><p className="text-sm text-gray-600 mb-1">Total Area</p><p className="text-2xl font-bold text-gray-800">{result.summary?.totalArea?.toFixed(2)} m²</p></div>

@@ -1,0 +1,11 @@
+# Python dependencies for area calculation service
+opencv-python==4.10.0.84
+numpy==1.26.4
+pdf2image==1.17.0
+pillow==10.4.0
+
+# Required system dependencies (install separately):
+# - poppler-utils (for pdf2image)
+#   macOS: brew install poppler
+#   Ubuntu: apt-get install poppler-utils
+#   Windows: Download from https://github.com/oschwartz10612/poppler-windows/releases/
