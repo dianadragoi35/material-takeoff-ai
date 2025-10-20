@@ -1,0 +1,5 @@
+{
+  "name": "Material Takeoff AI",
+  "description": "An application to analyze construction plan PDFs for roof-related materials and generate a material takeoff using Gemini.",
+  "requestFramePermissions": []
+}
